@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Công Cụ Spam Tin Nhắn TikTok</title>
+<style>
+  body{background:#111;color:#0f0;font-family:monospace;padding:20px}
+  textarea,input,button{background:#000;color:#0f0;border:1px solid #0f0;padding:8px;width:100%;margin:5px 0;box-sizing:border-box}
+  button{cursor:pointer;font-weight:bold}
+  button:hover{background:#0f0;color:#000}
+  #log{height:250px;overflow:auto;border:1px solid #0f0;padding:8px;white-space:pre-wrap;background:#000}
+  .row{display:flex;gap:10px}
+  .row > div{flex:1}
+</style>
+</head>
+<body>
+<h3>=== CÔNG CỤ SPAM TIN NHẮN TIKTOK ===</h3>
+
+<label>Link tài khoản TikTok cần spam:</label>
+<input id="link" type="text" placeholder="https://www.tiktok.com/@username">
+
+<label>Nội dung tin nhắn:</label>
+<textarea id="msg" rows="3">xin chào</textarea>
+
+<div class="row">
+  <div>
+    <label>Số lần gửi:</label>
+    <input id="count" type="number" value="50">
+  </div>
+  <div>
+    <label>Delay (ms):</label>
+    <input id="delay" type="number" value="1500">
+  </div>
+  <div>
+    <label>Jitter ngẫu nhiên (ms):</label>
+    <input id="jitter" type="number" value="800">
+  </div>
+</div>
+
+<button onclick="moTaiKhoan()">1. MỞ TÀI KHOẢN TIKTOK</button>
+<button onclick="batDauSpam()">2. BẮT ĐẦU SPAM</button>
+<button onclick="dungSpam()">3. DỪNG</button>
+
+<div id="log"></div>
+
+<script>
+// Biến toàn cục điều khiển vòng lặp spam
+let dangChay = false;
+
+// Ghi log ra màn hình
+function ghiLog(t){
+  const el = document.getElementById('log');
+  el.textContent += t + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+// Hàm delay dùng Promise
+function cho(ms){
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// Random số nguyên trong khoảng
+function ngauNhien(min,max){
+  return Math.floor(Math.random()*(max-min+1))+min;
+}
+
+// Mở link tài khoản TikTok trong tab mới
+function moTaiKhoan(){
+  const link = document.getElementById('link').value.trim();
+  if(!link){
+    ghiLog("[LỖI] Chưa nhập link tài khoản");
+    return;
+  }
+  window.open(link, '_blank');
+  ghiLog("[MỞ] Đã mở link: " + link);
+  ghiLog("[HƯỚNG DẪN] Đăng nhập, mở khung chat với tài khoản đó rồi bấm BẮT ĐẦU SPAM");
+}
+
+// Tìm ô nhập tin nhắn trong khung chat TikTok
+function timONhap(){
+  const danhSach = [
+    'div[contenteditable="true"]',
+    'textarea[data-e2e="chat-input"]',
+    'div[data-e2e="chat-input"]',
+    'textarea'
+  ];
+  for(const s of danhSach){
+    const el = document.querySelector(s);
+    if(el) return el;
+  }
+  return null;
+}
+
+// Tìm nút gửi tin nhắn
+function timNutGui(){
+  const danhSach = [
+    'button[data-e2e="chat-send"]',
+    'button[type="submit"]',
+    'div[data-e2e="chat-send"]'
+  ];
+  for(const s of danhSach){
+    const el = document.querySelector(s);
+    if(el) return el;
+  }
+  return null;
+}
+
+// Chèn nội dung vào ô nhập
+function chenNoiDung(el, text){
+  el.focus();
+  if(el.tagName === 'TEXTAREA'){
+    el.value = text;
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+  }else{
+    el.textContent = text;
+    el.dispatchEvent(new InputEvent('input',{bubbles:true}));
+  }
+}
+
+// Gửi một tin nhắn
+async function guiMotTin(noiDung){
+  const oNhap = timONhap();
+  if(!oNhap){
+    ghiLog("[LỖI] Không tìm thấy ô nhập tin nhắn. Hãy mở khung chat trước.");
+    return false;
+  }
+  chenNoiDung(oNhap, noiDung);
+  await cho(ngauNhien(200,600));
+
+  // Gửi bằng phím Enter
+  const ev = new KeyboardEvent('keydown',{
+    key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true
+  });
+  oNhap.dispatchEvent(ev);
+
+  await cho(ngauNhien(150,400));
+
+  // Dự phòng bấm nút gửi
+  const nut = timNutGui();
+  if(nut) nut.click();
+
+  return true;
+}
+
+// Vòng lặp spam chính
+async function batDauSpam(){
+  if(dangChay) return;
+
+  const link = document.getElementById('link').value.trim();
+  if(!link){
+    ghiLog("[LỖI] Chưa nhập link tài khoản TikTok");
+    return;
+  }
+
+  dangChay = true;
+  const noiDung = document.getElementById('msg').value;
+  const soLan = parseInt(document.getElementById('count').value) || 1;
+  const delay = parseInt(document.getElementById('delay').value) || 1000;
+  const jitter = parseInt(document.getElementById('jitter').value) || 0;
+
+  ghiLog("[BẮT ĐẦU] Spam " + soLan + " tin vào " + link);
+
+  for(let i=0;i<soLan;i++){
+    if(!dangChay){ ghiLog("[DỪNG] Người dùng dừng"); break; }
+
+    const ok = await guiMotTin(noiDung);
+    ghiLog("[LẦN " + (i+1) + "] " + (ok ? "ĐÃ GỬI" : "THẤT BẠI"));
+
+    // Delay + jitter ngẫu nhiên tránh bị phát hiện
+    const wait = delay + ngauNhien(-jitter, jitter);
+    await cho(Math.max(300, wait));
+  }
+
+  ghiLog("[KẾT THÚC]");
+  dangChay = false;
+}
+
+// Dừng vòng lặp
+function dungSpam(){
+  dangChay = false;
+  ghiLog("[YÊU CẦU DỪNG]");
+}
+</script>
+</body>
+</html>
